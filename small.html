@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="color-scheme" content="light">
+  <title>響尾蛇小型計分板</title>
+  <style>
+    :root {
+      --orange: #ff8862;
+      --gray: #d9d9d9;
+      --ink: #232323;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--gray);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang TC", sans-serif;
+      color: var(--ink);
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .board {
+      width: 100%;
+      height: 100%;
+      padding: 5.5% 6%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 2%;
+      background: var(--gray);
+    }
+
+    .date {
+      text-align: center;
+      color: var(--orange);
+      font-size: clamp(14px, 4vw, 28px);
+      font-weight: 700;
+      letter-spacing: .02em;
+      white-space: nowrap;
+    }
+
+    .matchup {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: 2%;
+    }
+
+    .team {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo {
+      display: block;
+      width: min(34vw, 34vh, 190px);
+      height: min(34vw, 34vh, 190px);
+      object-fit: contain;
+    }
+
+    .abbr {
+      margin-top: -2%;
+      color: var(--orange);
+      font-size: clamp(13px, 3.4vw, 24px);
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    .score {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(7px, 2vw, 16px);
+      color: var(--ink);
+      font-size: clamp(34px, 12vw, 82px);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .dash {
+      color: var(--orange);
+      font-weight: 500;
+    }
+
+    .status {
+      min-height: 1.25em;
+      text-align: center;
+      color: var(--orange);
+      font-size: clamp(13px, 3.5vw, 24px);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .message {
+      grid-row: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: var(--orange);
+      font-size: clamp(16px, 5vw, 32px);
+      font-weight: 700;
+      padding: 8%;
+    }
+
+    /* 小型 Widgy 使用正方形擷取範圍；直向預覽時把內容集中在頂端正方形。 */
+    @media (max-aspect-ratio: 1/1) {
+      body {
+        align-items: flex-start;
+      }
+
+      .board {
+        height: 100vw;
+        padding: 7% 6%;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: 0;
+      }
+
+      .date {
+        font-size: clamp(14px, 4.5vw, 34px);
+      }
+
+      .logo {
+        width: min(28vw, 230px);
+        height: min(28vw, 230px);
+      }
+
+      .abbr,
+      .status {
+        font-size: clamp(12px, 3.4vw, 27px);
+      }
+
+      .score {
+        font-size: clamp(28px, 8.5vw, 68px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="board" id="board">
+    <div class="message">正在讀取響尾蛇比賽…</div>
+  </main>
+
+  <script>
+    const TEAM_ID = 109;
+    const REPO_RAW = "https://raw.githubusercontent.com/1017wen-svg/-mlb-widgy-logos/main";
+    const API = "https://statsapi.mlb.com/api/v1/schedule";
+    const TIME_ZONE = "Asia/Taipei";
+
+    const abbreviations = {
+      108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",
+      114:"CLE",115:"COL",116:"DET",117:"HOU",118:"KC",119:"LAD",
+      120:"WSH",121:"NYM",133:"ATH",134:"PIT",135:"SD",136:"SEA",
+      137:"SF",138:"STL",139:"TB",140:"TEX",141:"TOR",142:"MIN",
+      143:"PHI",144:"ATL",145:"CWS",146:"MIA",147:"NYY",158:"MIL"
+    };
+
+    function ymd(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function taipeiDay(date) {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).format(date);
+    }
+
+    function chooseGame(games) {
+      const now = new Date();
+      const today = taipeiDay(now);
+      const sorted = games.slice().sort((a, b) => new Date(a.gameDate) - new Date(b.gameDate));
+
+      const live = sorted.find(g => g.status && g.status.abstractGameState === "Live");
+      if (live) return live;
+
+      const todayGame = sorted.find(g => taipeiDay(new Date(g.gameDate)) === today);
+      if (todayGame) return todayGame;
+
+      const upcoming = sorted.find(g => new Date(g.gameDate) > now);
+      if (upcoming) return upcoming;
+
+      return sorted.length ? sorted[sorted.length - 1] : null;
+    }
+
+    function statusText(game) {
+      const status = game.status || {};
+      const detail = status.detailedState || "";
+      const state = status.abstractGameState || "";
+
+      if (/Postponed/i.test(detail)) return "比賽延賽";
+      if (/Cancelled|Canceled/i.test(detail)) return "比賽取消";
+      if (/Suspended/i.test(detail)) return "比賽暫停";
+      if (state === "Final") return "比賽結束";
+
+      if (state === "Live") {
+        const line = game.linescore || {};
+        const inning = line.currentInning;
+        const half = line.inningHalf === "Top" ? "上" :
+                     line.inningHalf === "Bottom" ? "下" : "";
+        return inning ? `第 ${inning} 局${half}` : "比賽進行中";
+      }
+
+      const gameTime = new Intl.DateTimeFormat("zh-TW", {
+        timeZone: TIME_ZONE,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      }).format(new Date(game.gameDate));
+      return `${gameTime} 開賽`;
+    }
+
+    function dateText(game) {
+      return new Intl.DateTimeFormat("zh-TW", {
+        timeZone: TIME_ZONE,
+        month: "2-digit",
+        day: "2-digit",
+        weekday: "short"
+      }).format(new Date(game.gameDate));
+    }
+
+    function logoUrl(id) {
+      return `${REPO_RAW}/${id}.png`;
+    }
+
+    function render(game) {
+      const away = game.teams.away;
+      const home = game.teams.home;
+      const awayId = away.team.id;
+      const homeId = home.team.id;
+      const awayScore = Number.isFinite(away.score) ? away.score : "–";
+      const homeScore = Number.isFinite(home.score) ? home.score : "–";
+
+      document.getElementById("board").innerHTML = `
+        <div class="date">${dateText(game)}</div>
+        <div class="matchup">
+          <section class="team">
+            <img class="logo" src="${logoUrl(awayId)}" alt="${away.team.name}">
+            <div class="abbr">${abbreviations[awayId] || "AWAY"}</div>
+          </section>
+          <div class="score">
+            <span>${awayScore}</span><span class="dash">–</span><span>${homeScore}</span>
+          </div>
+          <section class="team">
+            <img class="logo" src="${logoUrl(homeId)}" alt="${home.team.name}">
+            <div class="abbr">${abbreviations[homeId] || "HOME"}</div>
+          </section>
+        </div>
+        <div class="status">${statusText(game)}</div>
+      `;
+    }
+
+    function showMessage(message) {
+      document.getElementById("board").innerHTML = `<div class="message">${message}</div>`;
+    }
+
+    async function loadScore() {
+      try {
+        const start = new Date();
+        start.setDate(start.getDate() - 1);
+        const end = new Date();
+        end.setDate(end.getDate() + 14);
+
+        const query = new URLSearchParams({
+          sportId: "1",
+          teamId: String(TEAM_ID),
+          startDate: ymd(start),
+          endDate: ymd(end),
+          hydrate: "linescore",
+          _: String(Date.now())
+        });
+
+        const response = await fetch(`${API}?${query}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        const games = (data.dates || []).flatMap(day => day.games || []);
+        const game = chooseGame(games);
+
+        if (!game) {
+          showMessage("近期沒有響尾蛇比賽");
+          return;
+        }
+
+        render(game);
+      } catch (error) {
+        showMessage("比分資料暫時無法讀取");
+      }
+    }
+
+    loadScore();
+    setInterval(loadScore, 60000);
+  </script>
+</body>
+</html>
