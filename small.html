@@ -72,6 +72,12 @@
       object-fit: contain;
     }
 
+    /* 倉庫缺少自訂 PNG 時，將 MLB 官方 SVG 統一轉成橘色。 */
+    .logo.official-fallback {
+      filter: brightness(0) saturate(100%) invert(66%) sepia(52%)
+              saturate(1056%) hue-rotate(318deg) brightness(103%) contrast(101%);
+    }
+
     .abbr {
       margin-top: -2%;
       color: var(--orange);
@@ -247,6 +253,17 @@
       return `${REPO_RAW}/${id}.png`;
     }
 
+    function useOfficialLogo(image, id) {
+      if (image.dataset.fallbackUsed === "true") {
+        image.style.display = "none";
+        return;
+      }
+
+      image.dataset.fallbackUsed = "true";
+      image.classList.add("official-fallback");
+      image.src = `https://www.mlbstatic.com/team-logos/${id}.svg`;
+    }
+
     function render(game) {
       const away = game.teams.away;
       const home = game.teams.home;
@@ -259,14 +276,16 @@
         <div class="date">${dateText(game)}</div>
         <div class="matchup">
           <section class="team">
-            <img class="logo" src="${logoUrl(awayId)}" alt="${away.team.name}">
+            <img class="logo" src="${logoUrl(awayId)}" alt="${away.team.name}"
+                 onerror="useOfficialLogo(this, ${awayId})">
             <div class="abbr">${abbreviations[awayId] || "AWAY"}</div>
           </section>
           <div class="score">
             <span>${awayScore}</span><span class="dash">–</span><span>${homeScore}</span>
           </div>
           <section class="team">
-            <img class="logo" src="${logoUrl(homeId)}" alt="${home.team.name}">
+            <img class="logo" src="${logoUrl(homeId)}" alt="${home.team.name}"
+                 onerror="useOfficialLogo(this, ${homeId})">
             <div class="abbr">${abbreviations[homeId] || "HOME"}</div>
           </section>
         </div>
