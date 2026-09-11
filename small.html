@@ -74,6 +74,8 @@
 
     /* 倉庫缺少自訂 PNG 時，將 MLB 官方 SVG 統一轉成橘色。 */
     .logo.official-fallback {
+      width: min(20vw, 165px);
+      height: min(20vw, 165px);
       filter: brightness(0) saturate(100%) invert(66%) sepia(52%)
               saturate(1056%) hue-rotate(318deg) brightness(103%) contrast(101%);
     }
