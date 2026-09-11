@@ -65,19 +65,31 @@
       justify-content: center;
     }
 
-    .logo {
-      display: block;
-      width: min(34vw, 34vh, 190px);
-      height: min(34vw, 34vh, 190px);
-      object-fit: contain;
+    .logo-slot {
+      width: min(24vw, 175px);
+      height: min(24vw, 175px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex: 0 0 auto;
     }
 
-    /* 倉庫缺少自訂 PNG 時，將 MLB 官方 SVG 統一轉成橘色。 */
-    .logo.official-fallback {
-      width: min(20vw, 165px);
-      height: min(20vw, 165px);
+    .logo {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
       filter: brightness(0) saturate(100%) invert(66%) sepia(52%)
               saturate(1056%) hue-rotate(318deg) brightness(103%) contrast(101%);
+    }
+
+    .logo-missing {
+      display: none;
+      color: var(--orange);
+      font-size: clamp(22px, 7vw, 50px);
+      font-weight: 800;
+      letter-spacing: .04em;
     }
 
     .abbr {
@@ -144,9 +156,9 @@
         font-size: clamp(16px, 5.8vw, 44px);
       }
 
-      .logo {
-        width: min(28vw, 230px);
-        height: min(28vw, 230px);
+      .logo-slot {
+        width: min(22vw, 180px);
+        height: min(22vw, 180px);
       }
 
       .abbr {
@@ -251,19 +263,27 @@
       }).format(new Date(game.gameDate));
     }
 
-    function logoUrl(id) {
+    function customLogoUrl(id) {
       return `${REPO_RAW}/${id}.png`;
     }
 
-    function useOfficialLogo(image, id) {
-      if (image.dataset.fallbackUsed === "true") {
-        image.style.display = "none";
+    function officialLogoUrl(id) {
+      return `https://www.mlbstatic.com/team-logos/${id}.svg`;
+    }
+
+    function handleLogoError(image, id) {
+      if (image.dataset.source === "official") {
+        image.dataset.source = "custom";
+        image.src = customLogoUrl(id);
         return;
       }
 
-      image.dataset.fallbackUsed = "true";
-      image.classList.add("official-fallback");
-      image.src = `https://www.mlbstatic.com/team-logos/${id}.svg`;
+      if (image.dataset.source === "custom") {
+        const missing = image.nextElementSibling;
+        image.style.display = "none";
+        if (missing) missing.style.display = "block";
+        return;
+      }
     }
 
     function render(game) {
@@ -278,16 +298,22 @@
         <div class="date">${dateText(game)}</div>
         <div class="matchup">
           <section class="team">
-            <img class="logo" src="${logoUrl(awayId)}" alt="${away.team.name}"
-                 onerror="useOfficialLogo(this, ${awayId})">
+            <div class="logo-slot">
+              <img class="logo" src="${officialLogoUrl(awayId)}" alt="${away.team.name}"
+                   data-source="official" onerror="handleLogoError(this, ${awayId})">
+              <span class="logo-missing">${abbreviations[awayId] || "MLB"}</span>
+            </div>
             <div class="abbr">${abbreviations[awayId] || "AWAY"}</div>
           </section>
           <div class="score">
             <span>${awayScore}</span><span class="dash">–</span><span>${homeScore}</span>
           </div>
           <section class="team">
-            <img class="logo" src="${logoUrl(homeId)}" alt="${home.team.name}"
-                 onerror="useOfficialLogo(this, ${homeId})">
+            <div class="logo-slot">
+              <img class="logo" src="${officialLogoUrl(homeId)}" alt="${home.team.name}"
+                   data-source="official" onerror="handleLogoError(this, ${homeId})">
+              <span class="logo-missing">${abbreviations[homeId] || "MLB"}</span>
+            </div>
             <div class="abbr">${abbreviations[homeId] || "HOME"}</div>
           </section>
         </div>
